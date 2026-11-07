@@ -80,6 +80,15 @@ def _needed(history: list[tuple[int, int, str]], mode: Mode) -> list[avro.Schema
     return [avro.parse(t) for t in (texts if mode.value.endswith("_TRANSITIVE") else texts[-1:])]
 
 
+def _mode(db: sqlite3.Connection, subject: str | None) -> Mode:
+    """The subject's mode, else the global mode, else BACKWARD, read on an open connection."""
+    for key in ([subject] if subject else []) + [""]:
+        row = db.execute("SELECT mode FROM config WHERE subject = ?", (key,)).fetchone()
+        if row:
+            return Mode(row[0])
+    return DEFAULT_MODE
+
+
 class Store:
     """SQLite-backed registry; safe for concurrent use (one connection per operation, WAL)."""
 
@@ -103,11 +112,7 @@ class Store:
     def mode(self, subject: str | None) -> Mode:
         """The subject's mode, else the global mode, else BACKWARD."""
         with self._db() as db:
-            for key in ([subject] if subject else []) + [""]:
-                row = db.execute("SELECT mode FROM config WHERE subject = ?", (key,)).fetchone()
-                if row:
-                    return Mode(row[0])
-        return DEFAULT_MODE
+            return _mode(db, subject)
 
     def set_mode(self, subject: str | None, mode: Mode) -> None:
         """Set the mode for one subject, or the global mode when subject is None."""
@@ -142,10 +147,10 @@ class Store:
         check_subject(subject)
         schema = avro.parse(text)
         norm = avro.normalized(schema)
-        mode = self.mode(subject)
         with self._db() as db:
             db.execute("BEGIN IMMEDIATE")  # one writer at a time: version numbers never collide
             try:
+                mode = _mode(db, subject)  # read inside the transaction, so a concurrent mode change cannot slip in
                 history = self._history(db, subject)
                 row = db.execute("SELECT id FROM schemas WHERE normalized = ?", (norm,)).fetchone()
                 if row:

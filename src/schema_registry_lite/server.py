@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import re
+import sys
+import traceback
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -14,6 +16,7 @@ from .compat import Mode
 from .store import IncompatibleError, NotFoundError, Store
 
 MAX_BODY = 1024 * 1024
+READ_TIMEOUT = 30  # seconds a client may stall while sending a request
 CONTENT_TYPE = "application/vnd.schemaregistry.v1+json"
 
 Handler = Callable[[Store, dict[str, Any], list[str]], tuple[int, Any]]
@@ -117,6 +120,7 @@ def make_handler(store: Store) -> type[BaseHTTPRequestHandler]:
 
         server_version = "schema-registry-lite/0.1"
         sys_version = ""
+        timeout = READ_TIMEOUT  # a stalled client cannot hold a worker thread forever
 
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - stdlib signature
             """Silence the default per-request log line."""
@@ -133,7 +137,11 @@ def make_handler(store: Store) -> type[BaseHTTPRequestHandler]:
 
         def _body(self) -> dict[str, Any]:
             """Read a bounded JSON object body."""
-            length = int(self.headers.get("Content-Length") or 0)
+            raw = self.headers.get("Content-Length") or "0"
+            if not raw.isdigit():
+                self.close_connection = True
+                raise ApiError(400, 40001, "Content-Length must be a non-negative integer")
+            length = int(raw)
             if length > MAX_BODY:
                 self.close_connection = True  # the unread body must not be parsed as the next request
                 raise ApiError(413, 41301, f"request body larger than {MAX_BODY} bytes")
@@ -173,7 +181,8 @@ def make_handler(store: Store) -> type[BaseHTTPRequestHandler]:
                 self._send(404, {"error_code": code, "message": text})
             except ValueError as e:
                 self._send(422, {"error_code": 42202, "message": str(e)})
-            except Exception:  # never leak a traceback to the client
+            except Exception:  # never leak a traceback to the client; keep it for the operator
+                traceback.print_exc(file=sys.stderr)
                 self._send(500, {"error_code": 50001, "message": "internal error"})
 
         def do_GET(self) -> None:
