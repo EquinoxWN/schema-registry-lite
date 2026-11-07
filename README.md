@@ -15,7 +15,7 @@ and rule that failed. The second is only caught because the subject uses a trans
 
 ![a schema evolving through the registry API, with two rejections](docs/proof/demo.jpg)
 
-94 tests pass, including a 28-case compatibility matrix and property tests over random schemas.
+98 tests pass (94 when the image below was taken), including a 28-case compatibility matrix and property tests over random schemas.
 ruff and mypy --strict are clean, and pip-audit finds no known vulnerabilities:
 
 ![ruff, mypy, pytest, pip-audit and demo output](docs/proof/tests.jpg)
@@ -102,7 +102,7 @@ files to `.tmp/`, both git-ignored.
 python -m venv .venv && . .venv/bin/activate   # Windows: .venv\Scripts\activate
 make setup   # pip install -e ".[dev]"
 make lint    # ruff, ruff format --check, mypy --strict
-make test    # 94 tests
+make test    # 98 tests
 make audit   # pip-audit
 make demo    # the API on a temporary database
 make bench   # registration latency over 200 versions
@@ -130,12 +130,12 @@ Latest local run (full detail and the whole matrix in [docs/results/m1.md](docs/
 |---|---|---|
 | `tests/test_avro.py` | 31 | 12 valid schemas (recursive and namespaced included); 16 invalid ones refused with the reason; limits; normalized form |
 | `tests/test_compat.py` | 33 | 28 real-world changes with the right verdict under BACKWARD, FORWARD, FULL and NONE; reasons with paths; transitive modes; 3 properties over 200 random schemas each |
-| `tests/test_store.py` | 15 | IDs and versions, idempotent re-registration, nothing stored on rejection, modes, preview, not-found, subject names, 12 concurrent registrations, restart |
-| `tests/test_server.py` | 15 | The API over a real socket, 409 with reasons, Confluent error codes, a forged 50 MiB body refused unread, loopback-only CLI |
+| `tests/test_store.py` | 16 | IDs and versions, transitive modes check every version, idempotent re-registration, nothing stored on rejection, modes, preview, not-found, subject names, 12 concurrent registrations, restart |
+| `tests/test_server.py` | 18 | The API over a real socket, 409 with reasons, Confluent error codes, a forged 50 MiB body refused unread, negative Content-Length refused, stalled clients disconnected, 500s logged, loopback-only CLI |
 
 | Check | Result |
 |---|---|
-| Tests | 94 passed, 0 failed (warnings are errors) |
+| Tests | 98 passed, 0 failed (warnings are errors) |
 | Lint and types | ruff clean, ruff format clean, mypy --strict: no issues |
 | Audit | pip-audit: no known vulnerabilities (no runtime dependencies) |
 | Matrix | 28 Avro change cases: 8 fully compatible, 20 breaking in at least one direction |
@@ -183,6 +183,7 @@ What this repo must show before it counts as done:
 - [ADR 0002: standard-library HTTP server and SQLite instead of FastAPI and Postgres](docs/adr/0002-stdlib-http-and-sqlite.md)
 - [ADR 0003: identify schemas by a normalized form that keeps defaults](docs/adr/0003-identity-by-normalized-form.md)
 - [M1 results](docs/results/m1.md)
+- [Quality check 2026-11-01](docs/quality/2026-11-01.md): the ten engineering rules, evidence and mutation results
 
 ## Scope
 

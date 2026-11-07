@@ -5,11 +5,15 @@ from __future__ import annotations
 import argparse
 import http.client
 import json
+import socket
+import threading
 
 import pytest
 from conftest import Call, fld, record
 
+from schema_registry_lite import server as server_module
 from schema_registry_lite.cli import loopback
+from schema_registry_lite.store import Store
 
 V1 = record(fld("id", "long"))
 V2 = record(fld("id", "long"), fld("tier", "string", default="free"))
@@ -100,3 +104,40 @@ def test_cli_accepts_only_loopback_hosts() -> None:
     for host in ("0.0.0.0", "10.0.0.5", "example.com"):  # noqa: S104 - checking that it is refused
         with pytest.raises(argparse.ArgumentTypeError):
             loopback(host)
+
+
+def test_negative_content_length_is_refused_not_read_to_eof(api: Call) -> None:
+    port = int(api("GET", "/config", port=True)[1])
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    conn.putrequest("POST", "/subjects/s/versions")
+    conn.putheader("Content-Length", "-1")  # read(-1) would wait for the client to close
+    conn.endheaders()
+    resp = conn.getresponse()
+    assert (resp.status, json.loads(resp.read())["error_code"]) == (400, 40001)
+    conn.close()
+
+
+def test_a_stalled_client_is_disconnected(store: Store, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(server_module, "READ_TIMEOUT", 0.5)
+    srv = server_module.serve(store, "127.0.0.1", 0)
+    thread = threading.Thread(target=srv.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with socket.create_connection(("127.0.0.1", srv.server_address[1]), timeout=5) as sock:
+            sock.sendall(b"GET /subjects HTTP/1.1\r\nHost: x\r\n")  # headers never finished
+            assert sock.recv(1024) == b""  # the server closed the connection instead of waiting forever
+    finally:
+        srv.shutdown()
+        srv.server_close()
+        thread.join(timeout=5)
+
+
+def test_unexpected_errors_are_500_and_logged(
+    api: Call, store: Store, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def boom() -> list[str]:
+        raise RuntimeError("disk on fire")
+
+    monkeypatch.setattr(store, "subjects", boom)
+    assert api("GET", "/subjects") == (500, {"error_code": 50001, "message": "internal error"})
+    assert "RuntimeError: disk on fire" in capsys.readouterr().err

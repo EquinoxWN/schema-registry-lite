@@ -111,3 +111,16 @@ def test_re_registering_an_existing_version_skips_the_check_even_after_a_mode_ch
     store.set_mode("s", Mode.FULL_TRANSITIVE)
     again = store.register("s", V1)  # already version 1: returned as is, as Confluent does
     assert (again.version, again.created) == (1, False)
+
+
+def test_transitive_mode_checks_every_earlier_version(store: Store) -> None:
+    v1 = record(fld("id", "long"))
+    v2 = record(fld("id", "long"), fld("tier", "string", default="free"))
+    v3 = record(fld("id", "long"), fld("tier", "string"))  # reads v2 data, not v1 data
+    store.set_mode("t", Mode.BACKWARD_TRANSITIVE)
+    store.register("t", v1)
+    store.register("t", v2)
+    with pytest.raises(IncompatibleError, match="latest-1"):
+        store.register("t", v3)
+    store.set_mode("t", Mode.BACKWARD)
+    assert store.register("t", v3).version == 3
