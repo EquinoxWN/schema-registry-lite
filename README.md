@@ -130,12 +130,12 @@ Latest local run (full detail and the whole matrix in [docs/results/m1.md](docs/
 |---|---|---|
 | `tests/test_avro.py` | 31 | 12 valid schemas (recursive and namespaced included); 16 invalid ones refused with the reason; limits; normalized form |
 | `tests/test_compat.py` | 33 | 28 real-world changes with the right verdict under BACKWARD, FORWARD, FULL and NONE; reasons with paths; transitive modes; 3 properties over 200 random schemas each |
-| `tests/test_store.py` | 16 | IDs and versions, transitive modes check every version, idempotent re-registration, nothing stored on rejection, modes, preview, not-found, subject names, 12 concurrent registrations, restart |
+| `tests/test_store.py` | 17 | IDs and versions, transitive modes check every version, idempotent re-registration, nothing stored on rejection, modes, preview, not-found, subject names, 12 concurrent registrations, restart, versions in ASCII digits only |
 | `tests/test_server.py` | 18 | The API over a real socket, 409 with reasons, Confluent error codes, a forged 50 MiB body refused unread, negative Content-Length refused, stalled clients disconnected, 500s logged, loopback-only CLI |
 
 | Check | Result |
 |---|---|
-| Tests | 98 passed, 0 failed (warnings are errors) |
+| Tests | 99 passed, 0 failed (warnings are errors) |
 | Lint and types | ruff clean, ruff format clean, mypy --strict: no issues |
 | Audit | pip-audit: no known vulnerabilities (no runtime dependencies) |
 | Matrix | 28 Avro change cases: 8 fully compatible, 20 breaking in at least one direction |
