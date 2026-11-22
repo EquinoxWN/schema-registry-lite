@@ -79,6 +79,13 @@ def test_lookup_and_not_found(store: Store) -> None:
         store.schema(999)
 
 
+def test_versions_are_ascii_digits_only(store: Store) -> None:
+    store.register("s", V1)
+    for which in (chr(0x661), chr(0xB9), "-1", "1.0"):  # Arabic-Indic one, superscript one
+        with pytest.raises(ValueError, match="positive integer"):
+            store.version("s", which)
+
+
 @pytest.mark.parametrize("subject", ["", "a/b", "a b", "x" * 256, "../etc"])
 def test_bad_subject_names_are_refused(store: Store, subject: str) -> None:
     with pytest.raises(ValueError, match="invalid subject"):

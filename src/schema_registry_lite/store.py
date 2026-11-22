@@ -220,7 +220,7 @@ class Store:
         if which == "latest":
             v, sid, text = history[-1]
             return Version(subject, v, sid, text)
-        if not which.isdigit():
+        if not (which.isascii() and which.isdigit()):
             raise ValueError(f"version must be a positive integer or 'latest', got {which[:20]!r}")
         for v, sid, text in history:
             if v == int(which):

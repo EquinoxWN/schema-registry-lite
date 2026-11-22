@@ -138,7 +138,7 @@ def make_handler(store: Store) -> type[BaseHTTPRequestHandler]:
         def _body(self) -> dict[str, Any]:
             """Read a bounded JSON object body."""
             raw = self.headers.get("Content-Length") or "0"
-            if not raw.isdigit():
+            if not (raw.isascii() and raw.isdigit()):
                 self.close_connection = True
                 raise ApiError(400, 40001, "Content-Length must be a non-negative integer")
             length = int(raw)
