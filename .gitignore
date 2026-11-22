@@ -23,3 +23,9 @@ CLAUDE.md
 data/
 .hypothesis/
 .mypy_cache/
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.tfstate
